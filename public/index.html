@@ -1,0 +1,204 @@
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Finance App</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <!-- Include Chart.js -->
+</head>
+<body>
+<div class="header">
+    <h1>Personal Finance Management</h1>
+</div>
+
+<!-- Action Container for Add Income and Add Expense -->
+<div class="action-container">
+    <div class="block add-income">
+        <h2>Add Income</h2>
+        <button onclick="showIncomePrompt()">+ Add Income</button>
+    </div>
+
+    <div class="block add-expense">
+        <h2>Add Expense</h2>
+        <button onclick="showExpensePrompt()">- Add Expense</button>
+    </div>
+</div>
+
+<!-- Main Container for Summary and Lists -->
+<div class="container">
+    <!-- Summary Block -->
+    <div class="block summary">
+        <h2>Summary</h2>
+        <table class="summary-table">
+            <thead>
+            <tr class="thtext">
+                <th>Initial Balance</th>
+                <th>Total Income</th>
+                <th>Total Expenses</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr class="tbtext">
+                <td>$<span id="balance">0</span></td>
+                <td>$<span id="totalIncome">0</span></td>
+                <td>$<span id="totalExpenses">0</span></td>
+            </tr>
+            </tbody>
+        </table>
+
+        <!-- Pie Chart -->
+        <div class="pie-chart">
+            <canvas id="incomeExpenseChart" width="200" height="200"></canvas>
+        </div>
+    </div>
+
+    <!-- Income List -->
+    <div class="block income-list">
+        <h2>Income List</h2>
+        <div id="incomeList">
+            <!-- Dynamic Income List -->
+        </div>
+    </div>
+
+    <!-- Expense List -->
+    <div class="block expense-list">
+        <h2>Expense List</h2>
+        <div id="expenseList">
+            <!-- Dynamic Expense List -->
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_URL = 'http://localhost:3000/api';
+
+    // Chart Instance
+    let incomeExpenseChart;
+
+    // Fetch and Update Summary
+    async function updateSummary() {
+        const [incomesRes, expensesRes] = await Promise.all([
+            fetch(`${API_URL}/income`),
+            fetch(`${API_URL}/expense`),
+        ]);
+
+        const incomes = await incomesRes.json();
+        const expenses = await expensesRes.json();
+
+        const totalIncome = incomes.reduce((sum, i) => sum + i.amount, 0);
+        const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+        const balance = totalIncome - totalExpenses;
+
+        document.getElementById('totalIncome').innerText = totalIncome.toFixed(2);
+        document.getElementById('totalExpenses').innerText = totalExpenses.toFixed(2);
+        document.getElementById('balance').innerText = balance.toFixed(2);
+
+        updateList('incomeList', incomes, 'income');
+        updateList('expenseList', expenses, 'expense');
+        updatePieChart(totalIncome, totalExpenses);
+    }
+
+    // Show Prompt for Adding Income
+    async function showIncomePrompt() {
+        const amount = parseFloat(prompt('Enter income amount:'));
+        const description = prompt('Enter income description:');
+        const source = prompt('Enter income source:');
+
+        if (amount && description && source) {
+            await fetch(`${API_URL}/income`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount, description, source }),
+            });
+            updateSummary();
+        } else {
+            alert('Please fill all details!');
+        }
+    }
+
+    // Show Prompt for Adding Expense
+    async function showExpensePrompt() {
+        const amount = parseFloat(prompt('Enter expense amount:'));
+        const description = prompt('Enter expense description:');
+        const category = prompt('Enter expense category:');
+
+        if (amount && description && category) {
+            await fetch(`${API_URL}/expense`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount, description, category }),
+            });
+            updateSummary();
+        } else {
+            alert('Please fill all details!');
+        }
+    }
+
+    // Update List
+    function updateList(elementId, items, type) {
+        const container = document.getElementById(elementId);
+        container.innerHTML = '';
+        items.forEach(item => {
+            const div = document.createElement('div');
+            div.classList.add('transaction-item');
+            div.innerHTML = `
+                <span>${item.amount} - ${item.description} (${item.source || item.category})</span>
+                <button class="delete-btn" onclick="deleteItem('${item._id}', '${type}')">Delete</button>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    // Delete Item
+    async function deleteItem(id, type) {
+        const confirmDelete = confirm(`Are you sure you want to delete this ${type}?`);
+        if (!confirmDelete) return;
+
+        try {
+            const response = await fetch(`http://localhost:3000/${type}/${id}`, {
+                method: 'DELETE',
+            });
+
+            alert(`${type.charAt(0).toUpperCase() + type.slice(1)} deleted successfully`);
+            updateSummary(); // Refresh data after deletion
+        } catch (error) {
+            alert(`Error deleting ${type}: ${error.message}`);
+            console.error(error);
+        }
+    }
+
+    // Update Pie Chart
+    function updatePieChart(totalIncome, totalExpenses) {
+        const ctx = document.getElementById('incomeExpenseChart').getContext('2d');
+
+        if (incomeExpenseChart) {
+            incomeExpenseChart.destroy();
+        }
+
+        incomeExpenseChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: ['Income', 'Expenses'],
+                datasets: [{
+                    data: [totalIncome, totalExpenses],
+                    backgroundColor: ['#FFA500FF', '#FF5722'],
+                }],
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                    },
+                },
+            },
+        });
+    }
+
+    // Initial Load
+    updateSummary();
+</script>
+</body>
+</html>

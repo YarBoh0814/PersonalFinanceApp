@@ -1,0 +1,22 @@
+version: "3.8"
+services:
+  app:
+    build:
+      context: .
+    ports:
+      - "3000:3000" # Maps the container's port 3000 to your host's port 3000
+    depends_on:
+      - mongo
+    volumes:
+      - .:/app # Optional: Bind the current directory to the container
+    environment:
+      - NODE_ENV=development
+  mongo:
+    image: mongo
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+volumes:
+  mongo_data:
